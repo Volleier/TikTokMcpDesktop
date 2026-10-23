@@ -118,6 +118,8 @@ public partial class MainWindow : Window
         TxtBaseUrl.Text = s.OpenAiBaseUrl;
         TxtModel.Text = s.OpenAiModel;
         TxtClientId.Text = s.ClientId;
+        TxtAppId.Text = s.AppId;
+        TxtAppSecret.Password = s.AppSecret ?? "";
         TxtSyncInterval.Text = s.SyncIntervalMinutes.ToString();
         ChkAutoSync.IsChecked = s.AutoSyncEnabled;
         TxtApiKey.Password = App.Services.Config.GetApiKey() ?? "";
@@ -146,6 +148,7 @@ public partial class MainWindow : Window
             s.OpenAiBaseUrl = TxtBaseUrl.Text.Trim();
             s.OpenAiModel = TxtModel.Text.Trim();
             s.ClientId = TxtClientId.Text.Trim();
+            s.AppId = TxtAppId.Text.Trim();
             s.SyncIntervalMinutes = int.TryParse(TxtSyncInterval.Text.Trim(), out var m) ? Math.Clamp(m, 5, 1440) : 60;
             s.AutoSyncEnabled = ChkAutoSync.IsChecked == true;
             if (CmbVariant.SelectedItem is ComboBoxItem v)
@@ -155,6 +158,7 @@ public partial class MainWindow : Window
 
             App.Services.Config.Save(s);
             App.Services.Config.SetApiKey(string.IsNullOrWhiteSpace(TxtApiKey.Password) ? null : TxtApiKey.Password);
+            App.Services.Config.SetAppSecret(string.IsNullOrWhiteSpace(TxtAppSecret.Password) ? null : TxtAppSecret.Password);
             if (previousVariant != s.McpVariant)
                 TxtSettingsStatus.Text = "已保存。MCP 变体已切换，请重新授权。";
             else
@@ -187,7 +191,10 @@ public partial class MainWindow : Window
         {
             TxtAuthStatus.Text = "已连接";
             TxtAuthStatus.Foreground = System.Windows.Media.Brushes.Teal;
-            TxtTokenExpiry.Text = $"变体 {s.McpVariant} · Access 过期(UTC): {token.ExpiresAt:u}";
+            var ads = token.AdvertiserIds.Count > 0
+                ? $" · advertisers: {string.Join(", ", token.AdvertiserIds.Take(5))}"
+                : "";
+            TxtTokenExpiry.Text = $"变体 {s.McpVariant} · resource={s.GetMcpUrl()} · Access 过期(UTC): {token.ExpiresAt:u}{ads}";
         }
     }
 

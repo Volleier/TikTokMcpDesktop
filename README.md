@@ -1,17 +1,17 @@
 # TikTok MCP Desktop
 
-独立 Windows 桌面小工具：配置 OpenAI 兼容 API → 授权 TikTok for Business Open MCP → 只读拉数落盘 → 自然语言查数 → 本机在线表格与多数据看板。
+**Windows 桌面程序**（WPF）：配置 OpenAI 兼容 API → 授权 **TikTok for Business Open MCP** → 只读拉数落盘 → 自然语言查数 → 本机表格与多数据看板。
 
-与任何 SaaS / AIEcomPlex 无依赖。
+- 不是网站产品；表格/看板嵌在桌面窗口内，数据来自本机。
+- 与 AIEcomPlex **无代码/库表依赖**；Open MCP 鉴权契约对齐其 `dev` 已验证实现。
+- **不是** Shop OpenAPI，也**不是** Marketing API 的 `Access-Token` 头。
 
 ## 功能
 
-- **设置**：`base_url` / `api_key` / `model` / `client_id` / MCP 变体（默认 layer）/ 同步间隔；密钥本地加密（Windows DPAPI）
-- **OAuth PKCE**：浏览器授权 → `127.0.0.1` 回调 → **JSON body** 换票；自动 refresh
-- **MCP**：`tools/list` / 白名单 `tools/call`；SSE 解析；写工具硬拦截
-- **对话**：OpenAI Chat Completions + function calling → MCP
-- **同步**：手动 / 定时拉数 → `data/pulls/{date}/` + SQLite
-- **表格 / 看板**：进程内 LocalApi（仅 loopback）+ WebView2 嵌入 Vue UI（交互参考 ZhiQu smart-table / dashboard，自研瘦客户端）
+- **设置**：`base_url` / `api_key` / `model` / `client_id`（及可选 `app_id`/`app_secret`）/ MCP 变体（默认 layer）；密钥 DPAPI 加密
+- **OAuth PKCE（Open MCP）**：`mcp-tt4b-authorize`（`client_id`+`app_id`+`resource`）→ `127.0.0.1` 回调（`code`/`auth_code`）→ **JSON 换票**；refresh；flat/layer 分存 token
+- **MCP**：`Authorization: Bearer` + JSON-RPC + SSE；只读白名单（对齐 AIEcomPlex 工具目录），写工具硬拒
+- **对话 / 同步 / 表格·看板**：均在桌面壳内完成
 
 ## 环境要求
 
@@ -83,7 +83,18 @@ dotnet run --project src/TikTokMcpDesktop -c Release
 - [x] WPF 壳：设置 / 授权 / 同步 / 对话 / WebView2 宿主（需在 Windows 运行）  
 - [ ] 真机 TikTok 授权与真实 MCP 工具：需有效 `client_id` 与 TT4B 账号（本环境为 Linux，无法跑 WPF GUI）
 
+## Open MCP 鉴权契约（对齐 AIEcomPlex）
+
+| 步骤 | 做法 |
+|------|------|
+| 授权页 | `.../portal/mcp-tt4b-authorize` + `client_id`/`app_id`/`resource`/`code_challenge` |
+| 换票 | `POST {mcp}/oauth/token`，**JSON body**：`grant_type,client_id,code,redirect_uri,code_verifier,resource`（可选 `secret`） |
+| 刷新 | JSON：`grant_type=refresh_token` + `client_id` + `refresh_token` + `resource` |
+| MCP | `POST {mcpUrl}` + `Authorization: Bearer` + JSON-RPC |
+| 默认拒写 | 如 `campaign_create` / `*_update` 等不可经对话或拉数调用 |
+
 ## 参考
 
-- TikTok for Business Open MCP 官方授权流程  
-- 表格/看板交互参考 [jiangzhikj/zq-platform](https://github.com/jiangzhikj/zq-platform)（`zq-smart-table` / `dashboard-design`），不复用其服务端
+- AIEcomPlex `aie-tiktok`：`TikTokAdsOAuthService` / `TikTokAdsMcpClient`（协议参考）  
+- TikTok for Business Open MCP 官方文档  
+- 表格/看板交互参考 ZhiQu 形态，自研瘦 UI，不复用 SaaS 后端

@@ -13,6 +13,11 @@ public sealed class ReauthRequiredException : Exception
     public ReauthRequiredException(string message) : base(message) { }
 }
 
+/// <summary>
+/// TikTok for Business Open MCP OAuth2 + PKCE.
+/// Contract mirrors AIEcomPlex TikTokAdsOAuthService (JSON token body, resource-bound tokens).
+/// Desktop redirect uses loopback HttpListener instead of SPA callback.
+/// </summary>
 public sealed class OAuthClient
 {
     private readonly TokenStore _tokenStore;
@@ -28,45 +33,49 @@ public sealed class OAuthClient
         AppSettings settings,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(settings.ClientId))
-            throw new InvalidOperationException("请先在设置中填写 client_id。");
+        var clientId = settings.EffectiveClientId;
+        if (string.IsNullOrWhiteSpace(clientId))
+            throw new InvalidOperationException("请先在设置中填写 client_id / app_id。");
 
         var variant = settings.McpVariant;
-        var resource = TikTokEndpoints.GetMcpUrl(variant);
+        var resource = settings.GetResource();
         var redirectUri = $"http://127.0.0.1:{settings.OAuthCallbackPort}/callback";
-        var verifier = Pkce.CreateVerifier();
+        var verifier = Pkce.CreateVerifier(32);
         var challenge = Pkce.CreateChallenge(verifier);
         var state = Pkce.CreateState();
 
+        // AIEcomPlex: client_id + app_id (both) on authorize URL
         var authUrl =
-            $"{TikTokEndpoints.AuthorizeUrl}" +
-            $"?client_id={Uri.EscapeDataString(settings.ClientId)}" +
+            $"{settings.GetAuthorizeUrl()}" +
+            $"?client_id={Uri.EscapeDataString(clientId)}" +
+            $"&app_id={Uri.EscapeDataString(clientId)}" +
+            $"&state={Uri.EscapeDataString(state)}" +
             $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
             $"&response_type=code" +
             $"&scope={Uri.EscapeDataString(TikTokEndpoints.Scope)}" +
-            $"&state={Uri.EscapeDataString(state)}" +
+            $"&resource={Uri.EscapeDataString(resource)}" +
             $"&code_challenge={Uri.EscapeDataString(challenge)}" +
-            $"&code_challenge_method=S256" +
-            $"&resource={Uri.EscapeDataString(resource)}";
+            $"&code_challenge_method=S256";
 
         using var listener = new HttpListener();
         listener.Prefixes.Add($"http://127.0.0.1:{settings.OAuthCallbackPort}/");
         listener.Start();
-        AppLog.Info($"OAuth listening on {redirectUri}");
+        AppLog.Info($"OAuth listening on {redirectUri} (variant={variant}, resource={resource})");
 
         try
         {
             OpenBrowser(authUrl);
             var context = await listener.GetContextAsync().WaitAsync(ct);
             var req = context.Request;
-            var code = req.QueryString["code"];
+            // AIEcomPlex callback accepts code | auth_code
+            var code = FirstNonEmpty(req.QueryString["code"], req.QueryString["auth_code"]);
             var returnedState = req.QueryString["state"];
             var error = req.QueryString["error"];
 
-            var html = "<html><body style='font-family:sans-serif;padding:2rem'><h2>Authorization complete</h2><p>You can close this window and return to the app.</p></body></html>";
+            var html = "<html><body style='font-family:sans-serif;padding:2rem'><h2>授权完成</h2><p>可以关闭此窗口，返回 TikTok MCP Desktop。</p></body></html>";
             if (!string.IsNullOrEmpty(error) || string.IsNullOrEmpty(code) || returnedState != state)
             {
-                html = $"<html><body style='font-family:sans-serif;padding:2rem'><h2>Authorization failed</h2><p>{WebUtility.HtmlEncode(error ?? "invalid state/code")}</p></body></html>";
+                html = $"<html><body style='font-family:sans-serif;padding:2rem'><h2>授权失败</h2><p>{WebUtility.HtmlEncode(error ?? "invalid state/code")}</p></body></html>";
             }
 
             var buffer = Encoding.UTF8.GetBytes(html);
@@ -82,7 +91,7 @@ public sealed class OAuthClient
 
             var token = await ExchangeCodeAsync(settings, code, redirectUri, verifier, resource, ct);
             _tokenStore.Save(variant, token);
-            AppLog.Info($"OAuth token saved for variant {variant}");
+            AppLog.Info($"OAuth token saved for variant {variant}; advertisers={token.AdvertiserIds.Count}");
             return token;
         }
         finally
@@ -107,14 +116,21 @@ public sealed class OAuthClient
         try
         {
             var refreshed = await RefreshAsync(settings, token.RefreshToken, ct);
+            // Preserve advertiser ids if refresh omits them
+            if (refreshed.AdvertiserIds.Count == 0 && token.AdvertiserIds.Count > 0)
+                refreshed.AdvertiserIds = token.AdvertiserIds;
             _tokenStore.Save(variant, refreshed);
             AppLog.Info("Access token refreshed");
             return refreshed.AccessToken;
         }
+        catch (ReauthRequiredException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             AppLog.Error($"Refresh failed: {ex.Message}");
-            throw new ReauthRequiredException("refresh_token 失效，请重新授权。");
+            throw new ReauthRequiredException("授权过期，请重连（refresh_token 失效）。");
         }
     }
 
@@ -126,28 +142,33 @@ public sealed class OAuthClient
         string resource,
         CancellationToken ct = default)
     {
+        // AIEcomPlex JSON body (not form-urlencoded by default)
         var body = new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
-            ["client_id"] = settings.ClientId,
+            ["client_id"] = settings.EffectiveClientId,
             ["code"] = code,
             ["redirect_uri"] = redirectUri,
             ["code_verifier"] = codeVerifier,
             ["resource"] = resource
         };
+        if (!string.IsNullOrWhiteSpace(settings.AppSecret))
+            body["secret"] = settings.AppSecret;
         return await RequestTokenAsync(settings, body, ct);
     }
 
     public async Task<OAuthTokenSet> RefreshAsync(AppSettings settings, string refreshToken, CancellationToken ct = default)
     {
-        var resource = TikTokEndpoints.GetMcpUrl(settings.McpVariant);
+        var resource = settings.GetResource();
         var body = new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",
-            ["client_id"] = settings.ClientId,
+            ["client_id"] = settings.EffectiveClientId,
             ["refresh_token"] = refreshToken,
             ["resource"] = resource
         };
+        if (!string.IsNullOrWhiteSpace(settings.AppSecret))
+            body["secret"] = settings.AppSecret;
         return await RequestTokenAsync(settings, body, ct);
     }
 
@@ -156,7 +177,7 @@ public sealed class OAuthClient
         Dictionary<string, string> body,
         CancellationToken ct)
     {
-        var url = TikTokEndpoints.GetTokenUrl(settings.McpVariant);
+        var url = settings.GetTokenUrl();
         HttpResponseMessage resp;
 
         if (settings.TokenRequestFormat == TokenRequestFormat.Form)
@@ -175,27 +196,68 @@ public sealed class OAuthClient
         if (!resp.IsSuccessStatusCode)
         {
             AppLog.Error($"Token endpoint {resp.StatusCode}: {AppLog.Redact(text)}");
+            if ((int)resp.StatusCode is 401 or 403)
+                throw new ReauthRequiredException("授权过期，请重连。");
             throw new InvalidOperationException($"换票失败 HTTP {(int)resp.StatusCode}");
         }
 
+        return ParseTokenResponse(text);
+    }
+
+    internal static OAuthTokenSet ParseTokenResponse(string text)
+    {
         using var doc = JsonDocument.Parse(text);
         var root = doc.RootElement;
-        var access = root.GetProperty("access_token").GetString()
-                     ?? throw new InvalidOperationException("响应缺少 access_token");
+
+        // Some gateways wrap under data
+        if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
+            root = data;
+
+        var access = root.TryGetProperty("access_token", out var at)
+            ? at.GetString()
+            : null;
+        if (string.IsNullOrEmpty(access))
+            throw new InvalidOperationException("响应缺少 access_token");
+
         var refresh = root.TryGetProperty("refresh_token", out var rt) ? rt.GetString() ?? "" : "";
-        var expiresIn = root.TryGetProperty("expires_in", out var ei) ? ei.GetInt32() : 3600;
-        var tokenType = root.TryGetProperty("token_type", out var tt) ? tt.GetString() : "Bearer";
-        var scope = root.TryGetProperty("scope", out var sc) ? sc.GetString() : TikTokEndpoints.Scope;
+        var expiresIn = 3600;
+        if (root.TryGetProperty("expires_in", out var ei))
+        {
+            if (ei.ValueKind == JsonValueKind.Number) expiresIn = ei.GetInt32();
+            else if (ei.ValueKind == JsonValueKind.String && int.TryParse(ei.GetString(), out var parsed))
+                expiresIn = parsed;
+        }
+
+        var advertisers = new List<string>();
+        if (root.TryGetProperty("advertiser_ids", out var aids))
+        {
+            if (aids.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var a in aids.EnumerateArray())
+                {
+                    var id = a.ValueKind == JsonValueKind.String ? a.GetString() : a.ToString();
+                    if (!string.IsNullOrWhiteSpace(id)) advertisers.Add(id!);
+                }
+            }
+            else if (aids.ValueKind == JsonValueKind.String)
+            {
+                advertisers.AddRange(aids.GetString()!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            }
+        }
 
         return new OAuthTokenSet
         {
-            AccessToken = access,
+            AccessToken = access!,
             RefreshToken = refresh,
             ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, expiresIn - 30)),
-            TokenType = tokenType,
-            Scope = scope
+            TokenType = root.TryGetProperty("token_type", out var tt) ? tt.GetString() : "Bearer",
+            Scope = root.TryGetProperty("scope", out var sc) ? sc.GetString() : TikTokEndpoints.Scope,
+            AdvertiserIds = advertisers
         };
     }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
 
     private static void OpenBrowser(string url)
     {

@@ -3,11 +3,13 @@ using System.Text;
 
 namespace TikTokMcpDesktop.Core.OAuth;
 
+/// <summary>PKCE helpers aligned with AIEcomPlex TikTokAdsOAuthService (32-byte verifier, S256).</summary>
 public static class Pkce
 {
-    public static string CreateVerifier(int size = 64)
+    /// <param name="byteLength">AIEcomPlex uses 32 random bytes → URL-safe Base64 verifier.</param>
+    public static string CreateVerifier(int byteLength = 32)
     {
-        var bytes = RandomNumberGenerator.GetBytes(size);
+        var bytes = RandomNumberGenerator.GetBytes(byteLength);
         return Base64Url(bytes);
     }
 

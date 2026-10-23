@@ -29,7 +29,10 @@ public sealed class ConfigStore
             if (!File.Exists(_path))
                 return new AppSettings();
             var json = File.ReadAllText(_path);
-            return JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+            var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions) ?? new AppSettings();
+            // App secret lives in SecretStore, not plain settings.json
+            settings.AppSecret = _secrets.Load().TikTokAppSecret ?? settings.AppSecret;
+            return settings;
         }
     }
 
@@ -37,7 +40,23 @@ public sealed class ConfigStore
     {
         lock (_lock)
         {
-            var json = JsonSerializer.Serialize(settings, JsonOptions);
+            // Persist non-secret settings without AppSecret plaintext
+            var toWrite = new AppSettings
+            {
+                OpenAiBaseUrl = settings.OpenAiBaseUrl,
+                OpenAiModel = settings.OpenAiModel,
+                ClientId = settings.ClientId,
+                AppId = settings.AppId,
+                AppSecret = "",
+                McpVariant = settings.McpVariant,
+                TokenRequestFormat = settings.TokenRequestFormat,
+                SyncIntervalMinutes = settings.SyncIntervalMinutes,
+                AutoSyncEnabled = settings.AutoSyncEnabled,
+                OAuthCallbackPort = settings.OAuthCallbackPort,
+                AuthorizeUrlOverride = settings.AuthorizeUrlOverride,
+                McpUrlOverride = settings.McpUrlOverride
+            };
+            var json = JsonSerializer.Serialize(toWrite, JsonOptions);
             File.WriteAllText(_path, json);
         }
     }
@@ -47,5 +66,10 @@ public sealed class ConfigStore
     public void SetApiKey(string? apiKey)
     {
         _secrets.Update(p => p.OpenAiApiKey = apiKey);
+    }
+
+    public void SetAppSecret(string? secret)
+    {
+        _secrets.Update(p => p.TikTokAppSecret = string.IsNullOrWhiteSpace(secret) ? null : secret);
     }
 }

@@ -53,8 +53,9 @@ public sealed class McpClient
         object? arguments,
         CancellationToken ct = default)
     {
-        if (ToolWhitelist.IsWriteTool(name))
-            throw new InvalidOperationException($"写工具已禁用: {name}");
+        // AIEcomPlex: not in allowlist / write → 403
+        if (!ToolWhitelist.IsAllowedForModel(name))
+            throw new InvalidOperationException($"工具未授权或已禁用: {name}");
 
         var args = arguments ?? new { };
         var result = await CallAsync(settings, "tools/call", new { name, arguments = args }, ct);
@@ -68,7 +69,7 @@ public sealed class McpClient
         CancellationToken ct = default)
     {
         var token = await _oauth.EnsureAccessTokenAsync(settings, ct);
-        var url = TikTokEndpoints.GetMcpUrl(settings.McpVariant);
+        var url = settings.GetMcpUrl();
         var id = Interlocked.Increment(ref _id);
         var payload = new Dictionary<string, object?>
         {
@@ -92,6 +93,8 @@ public sealed class McpClient
         if (!resp.IsSuccessStatusCode)
         {
             AppLog.Error($"MCP {method} HTTP {(int)resp.StatusCode}: {AppLog.Redact(body)}");
+            if ((int)resp.StatusCode is 401 or 403)
+                throw new ReauthRequiredException("授权过期，请重连。");
             throw new InvalidOperationException($"MCP 调用失败 HTTP {(int)resp.StatusCode}");
         }
 

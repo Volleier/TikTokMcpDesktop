@@ -7,6 +7,8 @@ namespace TikTokMcpDesktop.Core.Store;
 public sealed class SecretsPayload
 {
     public string? OpenAiApiKey { get; set; }
+    /// <summary>Optional app secret for token JSON field "secret" (rarely needed for Open MCP PKCE).</summary>
+    public string? TikTokAppSecret { get; set; }
     public Dictionary<string, OAuthTokenSet> TokensByVariant { get; set; } = new();
 }
 
@@ -17,6 +19,8 @@ public sealed class OAuthTokenSet
     public DateTimeOffset ExpiresAt { get; set; }
     public string? TokenType { get; set; }
     public string? Scope { get; set; }
+    /// <summary>From token response advertiser_ids when present (AIEcomPlex parity).</summary>
+    public List<string> AdvertiserIds { get; set; } = new();
 }
 
 /// <summary>
