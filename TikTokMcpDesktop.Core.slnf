@@ -1,0 +1,11 @@
+{
+  "solution": {
+    "path": "TikTokMcpDesktop.sln",
+    "projects": [
+      "src/TikTokMcpDesktop.Core/TikTokMcpDesktop.Core.csproj",
+      "src/TikTokMcpDesktop.LocalApi/TikTokMcpDesktop.LocalApi.csproj",
+      "src/TikTokMcpDesktop.DevHost/TikTokMcpDesktop.DevHost.csproj",
+      "tests/TikTokMcpDesktop.Core.Tests/TikTokMcpDesktop.Core.Tests.csproj"
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6A1014B2-1A63-4043-8015-C492CE493048}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TikTokMcpDesktop.Core", "src\TikTokMcpDesktop.Core\TikTokMcpDesktop.Core.csproj", "{B30BDFAC-0003-41ED-8A2C-58D9ED4DF983}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TikTokMcpDesktop.LocalApi", "src\TikTokMcpDesktop.LocalApi\TikTokMcpDesktop.LocalApi.csproj", "{B37042F0-5BB2-4687-8876-E2F9466A4443}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{7D85A049-88D4-4B23-8C42-9E98818E49DB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TikTokMcpDesktop.Core.Tests", "tests\TikTokMcpDesktop.Core.Tests\TikTokMcpDesktop.Core.Tests.csproj", "{9395D0C5-786B-4557-BD1E-7D7624FD1A94}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TikTokMcpDesktop", "src\TikTokMcpDesktop\TikTokMcpDesktop.csproj", "{9D364984-21C9-408F-9123-B08941FA24FB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TikTokMcpDesktop.DevHost", "src\TikTokMcpDesktop.DevHost\TikTokMcpDesktop.DevHost.csproj", "{F34D45A3-7C3A-4911-B3C9-5A70CED24BC0}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B30BDFAC-0003-41ED-8A2C-58D9ED4DF983}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B30BDFAC-0003-41ED-8A2C-58D9ED4DF983}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B30BDFAC-0003-41ED-8A2C-58D9ED4DF983}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B30BDFAC-0003-41ED-8A2C-58D9ED4DF983}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B37042F0-5BB2-4687-8876-E2F9466A4443}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B37042F0-5BB2-4687-8876-E2F9466A4443}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B37042F0-5BB2-4687-8876-E2F9466A4443}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B37042F0-5BB2-4687-8876-E2F9466A4443}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9395D0C5-786B-4557-BD1E-7D7624FD1A94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9395D0C5-786B-4557-BD1E-7D7624FD1A94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9395D0C5-786B-4557-BD1E-7D7624FD1A94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9395D0C5-786B-4557-BD1E-7D7624FD1A94}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9D364984-21C9-408F-9123-B08941FA24FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D364984-21C9-408F-9123-B08941FA24FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D364984-21C9-408F-9123-B08941FA24FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D364984-21C9-408F-9123-B08941FA24FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F34D45A3-7C3A-4911-B3C9-5A70CED24BC0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F34D45A3-7C3A-4911-B3C9-5A70CED24BC0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F34D45A3-7C3A-4911-B3C9-5A70CED24BC0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F34D45A3-7C3A-4911-B3C9-5A70CED24BC0}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{B30BDFAC-0003-41ED-8A2C-58D9ED4DF983} = {6A1014B2-1A63-4043-8015-C492CE493048}
+		{B37042F0-5BB2-4687-8876-E2F9466A4443} = {6A1014B2-1A63-4043-8015-C492CE493048}
+		{9395D0C5-786B-4557-BD1E-7D7624FD1A94} = {7D85A049-88D4-4B23-8C42-9E98818E49DB}
+		{9D364984-21C9-408F-9123-B08941FA24FB} = {6A1014B2-1A63-4043-8015-C492CE493048}
+		{F34D45A3-7C3A-4911-B3C9-5A70CED24BC0} = {6A1014B2-1A63-4043-8015-C492CE493048}
+	EndGlobalSection
+EndGlobal

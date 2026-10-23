@@ -1,0 +1,28 @@
+# Build
+**/bin/
+**/obj/
+**/publish/
+**/out/
+dist/
+*.user
+*.suo
+.vs/
+
+# Node
+web/ui/node_modules/
+web/ui/dist/
+
+# App data / secrets
+data/**
+!data/.gitkeep
+**/secrets.bin
+*.db
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
