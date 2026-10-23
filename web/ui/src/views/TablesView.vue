@@ -5,7 +5,7 @@
         <strong>数据表</strong>
         <button class="secondary" @click="loadTables" :disabled="loading">刷新</button>
       </div>
-      <div v-if="!tables.length" class="empty">暂无表。请先在桌面端「同步」拉取数据。</div>
+      <div v-if="!tables.length" class="empty">暂无表。请先同步 MCP，或用 DevHost 演示样本。</div>
       <button
         v-for="t in tables"
         :key="t.id"
@@ -13,7 +13,8 @@
         :class="{ active: t.id === tableId }"
         @click="selectTable(t.id)"
       >
-        <div>{{ t.name }}</div>
+        <div class="name">{{ t.name }}</div>
+        <div class="muted tiny">{{ t.sourceTool }}</div>
         <div class="muted tiny">{{ formatTime(t.lastSyncedAt) }}</div>
       </button>
     </aside>
@@ -22,7 +23,7 @@
       <div class="toolbar">
         <div>
           <h2>{{ detail.table.name }}</h2>
-          <div class="muted tiny">来源工具 {{ detail.table.sourceTool }} · {{ page?.total ?? 0 }} 行</div>
+          <div class="muted tiny">MCP 工具 {{ detail.table.sourceTool }} · {{ page?.total ?? 0 }} 行</div>
         </div>
         <div class="actions">
           <select v-model="filterField">
@@ -118,6 +119,11 @@ function formatTime(v?: string | null) {
 }
 function formatCell(v: unknown) {
   if (v === null || v === undefined) return ''
+  if (typeof v === 'number') {
+    return Number.isInteger(v)
+      ? v.toLocaleString('zh-CN')
+      : v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  }
   if (typeof v === 'object') return JSON.stringify(v)
   return String(v)
 }
@@ -195,23 +201,55 @@ onUnmounted(() => window.removeEventListener('ttmcp-data-changed', onDataChanged
 </script>
 
 <style scoped>
-.layout { display: grid; grid-template-columns: 240px 1fr; gap: 16px; height: calc(100vh - 90px); }
+.layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; height: calc(100vh - 96px); }
 .side { overflow: auto; }
 .side-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .table-item {
   display: block; width: 100%; text-align: left; background: transparent; color: var(--text);
-  border: 1px solid transparent; margin-bottom: 6px;
+  border: 1px solid transparent; margin-bottom: 6px; box-shadow: none; border-radius: 12px;
 }
-.table-item.active, .table-item:hover { background: var(--accent-soft); border-color: #99f6e4; }
+.table-item .name { font-weight: 600; }
+.table-item.active, .table-item:hover {
+  background: var(--accent-soft);
+  border-color: rgba(0, 242, 234, 0.35);
+  transform: none;
+}
 .main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .toolbar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
-.toolbar h2 { margin: 0; font-size: 18px; }
+.toolbar h2 {
+  margin: 0;
+  font-size: 20px;
+  font-family: "Sora", sans-serif;
+  letter-spacing: -0.03em;
+}
 .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.col-toggles { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
-.grid-wrap { flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+.col-toggles { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; color: var(--muted); }
+.grid-wrap {
+  flex: 1; overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(7, 11, 20, 0.45);
+}
 table { border-collapse: collapse; width: max-content; min-width: 100%; }
-th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; font-size: 13px; white-space: nowrap; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
-th { position: sticky; top: 0; background: #f8fafc; z-index: 1; }
+th, td {
+  border-bottom: 1px solid var(--border);
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 13px;
+  white-space: nowrap;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+th {
+  position: sticky; top: 0; z-index: 1;
+  background: rgba(18, 24, 38, 0.96);
+  color: #cbd5e1;
+}
+tbody tr:hover td { background: rgba(0, 242, 234, 0.05); }
 .pager { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
 .tiny { font-size: 12px; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; height: auto; }
+}
 </style>

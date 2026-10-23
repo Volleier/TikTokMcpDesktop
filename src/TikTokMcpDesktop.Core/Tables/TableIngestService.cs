@@ -35,9 +35,11 @@ public sealed class TableIngestService
         if (fieldNames.Count == 0)
             fieldNames.Add("value");
 
+        // Field ids are globally unique in SQLite; scope by table so shared MCP keys
+        // (advertiser_id, campaign_id, …) can coexist across tools.
         var fields = fieldNames.Select((name, i) => new DataField
         {
-            Id = name,
+            Id = $"{tableId}:{name}",
             TableId = tableId,
             Name = name,
             Type = InferType(rows, name),
@@ -52,7 +54,7 @@ public sealed class TableIngestService
             var row = rows[i];
             var values = new Dictionary<string, object?>();
             foreach (var f in fields)
-                values[f.Id] = row.TryGetValue(f.Id, out var v) ? v : null;
+                values[f.Id] = row.TryGetValue(f.Name, out var v) ? v : null;
 
             records.Add(new DataRecord
             {
@@ -66,7 +68,7 @@ public sealed class TableIngestService
         var meta = new DataTableMeta
         {
             Id = tableId,
-            Name = toolName,
+            Name = ToolDisplayNames.For(toolName),
             SourceTool = toolName,
             LastSyncedAt = now
         };

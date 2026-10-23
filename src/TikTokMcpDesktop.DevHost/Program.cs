@@ -1,5 +1,5 @@
-using System.Text.Json;
 using TikTokMcpDesktop.Core;
+using TikTokMcpDesktop.Core.Tables;
 using TikTokMcpDesktop.LocalApi;
 
 // Cross-platform host for LocalApi + web UI (useful on Linux CI where WPF cannot run).
@@ -10,20 +10,12 @@ root ??= Directory.GetCurrentDirectory();
 
 await using var services = new AppServices(root);
 
-// Seed demo rows if empty so tables/dashboards are browsable offline.
-if (services.Db.ListTables().Count == 0)
+// Seed TikTok Open MCP-shaped demo data when empty / incomplete so tables & charts are browsable offline.
+if (DemoDataSeeder.NeedsSeed(services.Db))
 {
-    using var doc = JsonDocument.Parse("""
-        {
-          "list": [
-            {"advertiser_id":"1001","name":"Demo Advertiser A","spend":120.5,"impressions":9000,"clicks":120},
-            {"advertiser_id":"1002","name":"Demo Advertiser B","spend":88.0,"impressions":5400,"clicks":77},
-            {"advertiser_id":"1003","name":"Demo Advertiser C","spend":210.25,"impressions":15000,"clicks":301}
-          ]
-        }
-        """);
-    services.Ingest.IngestToolResult("advertiser_info_get", doc.RootElement, Path.Combine(services.Paths.PullsDir, DateTime.Now.ToString("yyyy-MM-dd")));
-    Console.WriteLine("Seeded demo advertiser table.");
+    var pullDir = Path.Combine(services.Paths.PullsDir, DateTime.Now.ToString("yyyy-MM-dd"));
+    var n = DemoDataSeeder.Seed(services.Ingest, pullDir);
+    Console.WriteLine($"Seeded demo MCP tables ({n} rows): advertiser / campaign / adgroup / ad / report.");
 }
 
 await using var host = new LocalApiHost();

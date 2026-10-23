@@ -17,7 +17,7 @@ public sealed class DashboardLayout
 public sealed class DashboardWidget
 {
     public string Id { get; set; } = "";
-    public string Type { get; set; } = "kpi"; // kpi | chart-line | chart-bar | chart-pie | data-table
+    public string Type { get; set; } = "kpi"; // kpi | chart-line | chart-bar | chart-pie | chart-tree | data-table
     public string Title { get; set; } = "";
     public int ColSpan { get; set; } = 1;
     public string? Metric { get; set; }

@@ -30,9 +30,12 @@ public class TableIngestTests : IDisposable
         Assert.Equal(2, count);
         Assert.Single(_db.ListTables());
 
-        var page = _db.QueryRecords(table.Id, null, 50, "name", "contains", "A", null, null);
+        var detail = _db.GetTable(table.Id)!;
+        var nameField = detail.Fields.First(f => f.Name == "name").Id;
+        var advField = detail.Fields.First(f => f.Name == "advertiser_id").Id;
+        var page = _db.QueryRecords(table.Id, null, 50, nameField, "contains", "A", null, null);
         Assert.Equal(1, page.Total);
-        Assert.Equal("1", page.Items[0].Values["advertiser_id"]?.ToString());
+        Assert.Equal("1", page.Items[0].Values[advField]?.ToString());
 
         var csv = _ingest.ExportCsv(table.Id, _paths.ExportsDir);
         Assert.True(File.Exists(csv));
