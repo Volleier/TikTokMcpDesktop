@@ -40,9 +40,12 @@
         </div>
       </div>
     </section>
+    <section v-else-if="error" class="card empty">
+      <p class="err">{{ error }}</p>
+      <p class="muted tiny">请从左侧选择有效看板（overview / structure / performance / accounts）。</p>
+    </section>
     <section v-else class="card empty">加载看板…</section>
   </div>
-  <p v-if="error" class="err">{{ error }}</p>
 </template>
 
 <script setup lang="ts">
@@ -79,6 +82,8 @@ async function reload() {
     layout.value = await api.getDashboard(currentId.value)
     data.value = await api.dashboardData(currentId.value)
   } catch (e: any) {
+    layout.value = null
+    data.value = null
     error.value = e.message || String(e)
   }
 }
