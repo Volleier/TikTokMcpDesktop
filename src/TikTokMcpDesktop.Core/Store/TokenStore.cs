@@ -36,4 +36,29 @@ public sealed class TokenStore
             return true;
         return token.ExpiresAt <= DateTimeOffset.UtcNow + skew;
     }
+
+    public DynamicClientRegistration? GetDynamicClient(McpVariant variant)
+    {
+        var secrets = _secrets.Load();
+        return secrets.DynamicClientsByVariant.TryGetValue(Key(variant), out var c) ? c : null;
+    }
+
+    public void SaveDynamicClient(McpVariant variant, DynamicClientRegistration client)
+    {
+        _secrets.Update(p => p.DynamicClientsByVariant[Key(variant)] = client);
+    }
+
+    public void ClearDynamicClient(McpVariant variant)
+    {
+        _secrets.Update(p => p.DynamicClientsByVariant.Remove(Key(variant)));
+    }
+
+    /// <summary>Configured app id/client id wins; otherwise reuse DCR-issued client_id for this variant.</summary>
+    public string? ResolveClientId(AppSettings settings)
+    {
+        if (!string.IsNullOrWhiteSpace(settings.EffectiveClientId))
+            return settings.EffectiveClientId;
+        var dcr = GetDynamicClient(settings.McpVariant);
+        return string.IsNullOrWhiteSpace(dcr?.ClientId) ? null : dcr!.ClientId;
+    }
 }

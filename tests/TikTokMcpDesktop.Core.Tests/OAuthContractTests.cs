@@ -1,5 +1,6 @@
 using TikTokMcpDesktop.Core.Config;
 using TikTokMcpDesktop.Core.OAuth;
+using TikTokMcpDesktop.Core.Store;
 
 namespace TikTokMcpDesktop.Core.Tests;
 
@@ -12,6 +13,33 @@ public class OAuthContractTests
         Assert.Equal("aid", s.EffectiveClientId);
         Assert.Equal(TikTokEndpoints.LayerMcpUrl, s.GetMcpUrl());
         Assert.Equal($"{TikTokEndpoints.LayerMcpUrl}/oauth/token", s.GetTokenUrl());
+        Assert.Equal($"{TikTokEndpoints.LayerMcpUrl}/oauth/register", TikTokEndpoints.GetRegisterUrl(McpVariant.Layer));
+    }
+
+    [Fact]
+    public void ResolveClientId_Falls_Back_To_Dcr_When_Settings_Empty()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ttmcp-dcr-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var paths = new AppPaths(root);
+            var secrets = new SecretStore(paths);
+            var tokens = new TokenStore(secrets);
+            var settings = new AppSettings { ClientId = "", AppId = "" };
+            Assert.Null(tokens.ResolveClientId(settings));
+
+            tokens.SaveDynamicClient(McpVariant.Layer, new DynamicClientRegistration
+            {
+                ClientId = "dcr-client-xyz",
+                RedirectUri = "http://127.0.0.1:17865/callback"
+            });
+            Assert.Equal("dcr-client-xyz", tokens.ResolveClientId(settings));
+        }
+        finally
+        {
+            try { Directory.Delete(root, true); } catch { /* ignore */ }
+        }
     }
 
     [Fact]

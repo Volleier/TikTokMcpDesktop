@@ -9,7 +9,7 @@
 ## 功能
 
 - **设置**：`base_url` / `api_key` / `model` / `client_id`（及可选 `app_id`/`app_secret`）/ MCP 变体（默认 layer）；密钥 DPAPI 加密
-- **OAuth PKCE（Open MCP）**：`mcp-tt4b-authorize`（`client_id`+`app_id`+`resource`）→ `127.0.0.1` 回调（`code`/`auth_code`）→ **JSON 换票**；refresh；flat/layer 分存 token
+- **OAuth PKCE（Open MCP）**：**默认无需填写 client_id**——授权时先 `POST {mcp}/oauth/register` 动态注册公钥客户端，再打开 `mcp-tt4b-authorize` → 本机回调 → **JSON 换票**；也可手动填固定 client_id；flat/layer 分存 token
 - **MCP**：`Authorization: Bearer` + JSON-RPC + SSE；只读白名单（对齐 AIEcomPlex 工具目录），写工具硬拒
 - **对话 / 同步 / 表格·看板**：均在桌面壳内完成
 
@@ -87,8 +87,9 @@ dotnet run --project src/TikTokMcpDesktop -c Release
 
 | 步骤 | 做法 |
 |------|------|
+| 客户端 | 默认 **DCR**：`POST {mcp}/oauth/register`（`token_endpoint_auth_method=none`）；可选固定 client_id |
 | 授权页 | `.../portal/mcp-tt4b-authorize` + `client_id`/`app_id`/`resource`/`code_challenge` |
-| 换票 | `POST {mcp}/oauth/token`，**JSON body**：`grant_type,client_id,code,redirect_uri,code_verifier,resource`（可选 `secret`） |
+| 换票 | `POST {mcp}/oauth/token`，**JSON body**：`grant_type,client_id,code,redirect_uri,code_verifier,resource` |
 | 刷新 | JSON：`grant_type=refresh_token` + `client_id` + `refresh_token` + `resource` |
 | MCP | `POST {mcpUrl}` + `Authorization: Bearer` + JSON-RPC |
 | 默认拒写 | 如 `campaign_create` / `*_update` 等不可经对话或拉数调用 |

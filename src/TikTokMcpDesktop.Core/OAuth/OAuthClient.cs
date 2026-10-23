@@ -15,8 +15,8 @@ public sealed class ReauthRequiredException : Exception
 
 /// <summary>
 /// TikTok for Business Open MCP OAuth2 + PKCE.
-/// Contract mirrors AIEcomPlex TikTokAdsOAuthService (JSON token body, resource-bound tokens).
-/// Desktop redirect uses loopback HttpListener instead of SPA callback.
+/// Default path: Dynamic Client Registration (no preconfigured client_id), then authorize + JSON token exchange.
+/// Optional fixed client_id/app_id still supported when filled in settings.
 /// </summary>
 public sealed class OAuthClient
 {
@@ -33,18 +33,15 @@ public sealed class OAuthClient
         AppSettings settings,
         CancellationToken ct = default)
     {
-        var clientId = settings.EffectiveClientId;
-        if (string.IsNullOrWhiteSpace(clientId))
-            throw new InvalidOperationException("请先在设置中填写 client_id / app_id。");
-
         var variant = settings.McpVariant;
         var resource = settings.GetResource();
         var redirectUri = $"http://127.0.0.1:{settings.OAuthCallbackPort}/callback";
+
+        var clientId = await EnsureClientIdAsync(settings, redirectUri, ct);
         var verifier = Pkce.CreateVerifier(32);
         var challenge = Pkce.CreateChallenge(verifier);
         var state = Pkce.CreateState();
 
-        // AIEcomPlex: client_id + app_id (both) on authorize URL
         var authUrl =
             $"{settings.GetAuthorizeUrl()}" +
             $"?client_id={Uri.EscapeDataString(clientId)}" +
@@ -60,14 +57,13 @@ public sealed class OAuthClient
         using var listener = new HttpListener();
         listener.Prefixes.Add($"http://127.0.0.1:{settings.OAuthCallbackPort}/");
         listener.Start();
-        AppLog.Info($"OAuth listening on {redirectUri} (variant={variant}, resource={resource})");
+        AppLog.Info($"OAuth listening on {redirectUri} (variant={variant}, client={RedactId(clientId)})");
 
         try
         {
             OpenBrowser(authUrl);
             var context = await listener.GetContextAsync().WaitAsync(ct);
             var req = context.Request;
-            // AIEcomPlex callback accepts code | auth_code
             var code = FirstNonEmpty(req.QueryString["code"], req.QueryString["auth_code"]);
             var returnedState = req.QueryString["state"];
             var error = req.QueryString["error"];
@@ -89,7 +85,7 @@ public sealed class OAuthClient
             if (string.IsNullOrEmpty(code) || returnedState != state)
                 throw new InvalidOperationException("授权回调无效（state/code 校验失败）。");
 
-            var token = await ExchangeCodeAsync(settings, code, redirectUri, verifier, resource, ct);
+            var token = await ExchangeCodeAsync(settings, clientId, code, redirectUri, verifier, resource, ct);
             _tokenStore.Save(variant, token);
             AppLog.Info($"OAuth token saved for variant {variant}; advertisers={token.AdvertiserIds.Count}");
             return token;
@@ -98,6 +94,73 @@ public sealed class OAuthClient
         {
             listener.Stop();
         }
+    }
+
+    /// <summary>
+    /// Prefer settings client_id/app_id; otherwise reuse or create DCR client for this MCP variant.
+    /// </summary>
+    public async Task<string> EnsureClientIdAsync(AppSettings settings, string redirectUri, CancellationToken ct = default)
+    {
+        var existing = _tokenStore.ResolveClientId(settings);
+        if (!string.IsNullOrWhiteSpace(existing))
+        {
+            // If DCR client was registered for a different redirect, re-register
+            var dcr = _tokenStore.GetDynamicClient(settings.McpVariant);
+            if (!string.IsNullOrWhiteSpace(settings.EffectiveClientId) ||
+                dcr is null ||
+                string.Equals(dcr.RedirectUri, redirectUri, StringComparison.Ordinal))
+            {
+                return existing!;
+            }
+        }
+
+        AppLog.Info("No client_id configured — Dynamic Client Registration…");
+        var registered = await RegisterDynamicClientAsync(settings, redirectUri, ct);
+        _tokenStore.SaveDynamicClient(settings.McpVariant, registered);
+        AppLog.Info($"DCR client_id issued for {settings.McpVariant}: {RedactId(registered.ClientId)}");
+        return registered.ClientId;
+    }
+
+    public async Task<DynamicClientRegistration> RegisterDynamicClientAsync(
+        AppSettings settings,
+        string redirectUri,
+        CancellationToken ct = default)
+    {
+        var url = $"{settings.GetMcpUrl().TrimEnd('/')}/oauth/register";
+        var body = new Dictionary<string, object?>
+        {
+            ["client_name"] = "TikTok MCP Desktop",
+            ["redirect_uris"] = new[] { redirectUri },
+            ["grant_types"] = new[] { "authorization_code", "refresh_token" },
+            ["response_types"] = new[] { "code" },
+            ["token_endpoint_auth_method"] = "none",
+            ["scope"] = TikTokEndpoints.Scope
+        };
+
+        using var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(url, content, ct);
+        var text = await resp.Content.ReadAsStringAsync(ct);
+        if (!resp.IsSuccessStatusCode)
+        {
+            AppLog.Error($"DCR register HTTP {(int)resp.StatusCode}: {AppLog.Redact(text)}");
+            throw new InvalidOperationException($"动态客户端注册失败 HTTP {(int)resp.StatusCode}");
+        }
+
+        using var doc = JsonDocument.Parse(text);
+        var root = doc.RootElement;
+        if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
+            root = data;
+
+        var clientId = root.TryGetProperty("client_id", out var cid) ? cid.GetString() : null;
+        if (string.IsNullOrWhiteSpace(clientId))
+            throw new InvalidOperationException("DCR 响应缺少 client_id");
+
+        return new DynamicClientRegistration
+        {
+            ClientId = clientId!,
+            RedirectUri = redirectUri,
+            RegisteredAt = DateTimeOffset.UtcNow
+        };
     }
 
     public async Task<string> EnsureAccessTokenAsync(AppSettings settings, CancellationToken ct = default)
@@ -113,10 +176,12 @@ public sealed class OAuthClient
         if (string.IsNullOrEmpty(token.RefreshToken))
             throw new ReauthRequiredException("access_token 已过期且无 refresh_token，请重新授权。");
 
+        var clientId = _tokenStore.ResolveClientId(settings)
+                       ?? throw new ReauthRequiredException("缺少 client_id（请重新授权以完成动态注册）。");
+
         try
         {
-            var refreshed = await RefreshAsync(settings, token.RefreshToken, ct);
-            // Preserve advertiser ids if refresh omits them
+            var refreshed = await RefreshAsync(settings, clientId, token.RefreshToken, ct);
             if (refreshed.AdvertiserIds.Count == 0 && token.AdvertiserIds.Count > 0)
                 refreshed.AdvertiserIds = token.AdvertiserIds;
             _tokenStore.Save(variant, refreshed);
@@ -136,17 +201,17 @@ public sealed class OAuthClient
 
     public async Task<OAuthTokenSet> ExchangeCodeAsync(
         AppSettings settings,
+        string clientId,
         string code,
         string redirectUri,
         string codeVerifier,
         string resource,
         CancellationToken ct = default)
     {
-        // AIEcomPlex JSON body (not form-urlencoded by default)
         var body = new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
-            ["client_id"] = settings.EffectiveClientId,
+            ["client_id"] = clientId,
             ["code"] = code,
             ["redirect_uri"] = redirectUri,
             ["code_verifier"] = codeVerifier,
@@ -157,15 +222,18 @@ public sealed class OAuthClient
         return await RequestTokenAsync(settings, body, ct);
     }
 
-    public async Task<OAuthTokenSet> RefreshAsync(AppSettings settings, string refreshToken, CancellationToken ct = default)
+    public async Task<OAuthTokenSet> RefreshAsync(
+        AppSettings settings,
+        string clientId,
+        string refreshToken,
+        CancellationToken ct = default)
     {
-        var resource = settings.GetResource();
         var body = new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",
-            ["client_id"] = settings.EffectiveClientId,
+            ["client_id"] = clientId,
             ["refresh_token"] = refreshToken,
-            ["resource"] = resource
+            ["resource"] = settings.GetResource()
         };
         if (!string.IsNullOrWhiteSpace(settings.AppSecret))
             body["secret"] = settings.AppSecret;
@@ -209,13 +277,10 @@ public sealed class OAuthClient
         using var doc = JsonDocument.Parse(text);
         var root = doc.RootElement;
 
-        // Some gateways wrap under data
         if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
             root = data;
 
-        var access = root.TryGetProperty("access_token", out var at)
-            ? at.GetString()
-            : null;
+        var access = root.TryGetProperty("access_token", out var at) ? at.GetString() : null;
         if (string.IsNullOrEmpty(access))
             throw new InvalidOperationException("响应缺少 access_token");
 
@@ -258,6 +323,9 @@ public sealed class OAuthClient
 
     private static string? FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
+
+    private static string RedactId(string id) =>
+        id.Length <= 8 ? "***" : id[..4] + "…" + id[^2..];
 
     private static void OpenBrowser(string url)
     {

@@ -71,4 +71,7 @@ public static class TikTokEndpoints
 
     public static string GetTokenUrl(McpVariant variant) =>
         $"{GetMcpUrl(variant).TrimEnd('/')}/oauth/token";
+
+    public static string GetRegisterUrl(McpVariant variant) =>
+        $"{GetMcpUrl(variant).TrimEnd('/')}/oauth/register";
 }

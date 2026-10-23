@@ -179,7 +179,7 @@ public partial class MainWindow : Window
         {
             TxtAuthStatus.Text = "未连接";
             TxtAuthStatus.Foreground = System.Windows.Media.Brushes.DarkRed;
-            TxtTokenExpiry.Text = "点击「授权登录」完成 TikTok for Business Open MCP 授权。";
+            TxtTokenExpiry.Text = "点击「授权登录」即可（可无 client_id，将自动动态注册客户端）。";
         }
         else if (token.ExpiresAt <= DateTimeOffset.UtcNow)
         {

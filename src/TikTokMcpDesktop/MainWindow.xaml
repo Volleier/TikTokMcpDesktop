@@ -47,11 +47,11 @@
             <PasswordBox x:Name="TxtApiKey"/>
             <Label Content="Model"/>
             <TextBox x:Name="TxtModel"/>
-            <Label Content="TikTok Open MCP client_id"/>
+            <Label Content="client_id（可选；留空则授权时自动 Dynamic Client Registration）"/>
             <TextBox x:Name="TxtClientId"/>
-            <Label Content="app_id（可选；填写后优先作 client，与 AIEcomPlex 一致）"/>
+            <Label Content="app_id（可选；填写后优先作 client）"/>
             <TextBox x:Name="TxtAppId"/>
-            <Label Content="app_secret（可选；Open MCP+PKCE 通常不需要）"/>
+            <Label Content="app_secret（可选；DCR 公钥客户端不需要）"/>
             <PasswordBox x:Name="TxtAppSecret"/>
             <Label Content="MCP 变体（token 与 path 绑定，切换需重授权）"/>
             <ComboBox x:Name="CmbVariant" Margin="0,0,0,10">
@@ -78,7 +78,7 @@
           <StackPanel>
             <TextBlock Text="TikTok for Business Open MCP" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,8"/>
             <TextBlock TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,16"
-                       Text="桌面本机授权：打开 TT4B 授权页 → 127.0.0.1 回调 → JSON 换票（PKCE）。非 Shop OpenAPI，也非 Marketing API 的 Access-Token 头。"/>
+                       Text="无需预先填写 client_id：点击授权后自动向 Open MCP 做动态客户端注册，再打开 TT4B 授权页 → 本机回调 → JSON 换票（PKCE）。非 Marketing API Access-Token。"/>
             <TextBlock x:Name="TxtAuthStatus" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
             <TextBlock x:Name="TxtTokenExpiry" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,16"/>
             <StackPanel Orientation="Horizontal">

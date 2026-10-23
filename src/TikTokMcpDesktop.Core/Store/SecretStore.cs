@@ -10,6 +10,15 @@ public sealed class SecretsPayload
     /// <summary>Optional app secret for token JSON field "secret" (rarely needed for Open MCP PKCE).</summary>
     public string? TikTokAppSecret { get; set; }
     public Dictionary<string, OAuthTokenSet> TokensByVariant { get; set; } = new();
+    /// <summary>Per-variant client_id from Dynamic Client Registration (no preconfigured app required).</summary>
+    public Dictionary<string, DynamicClientRegistration> DynamicClientsByVariant { get; set; } = new();
+}
+
+public sealed class DynamicClientRegistration
+{
+    public string ClientId { get; set; } = "";
+    public string RedirectUri { get; set; } = "";
+    public DateTimeOffset RegisteredAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class OAuthTokenSet
