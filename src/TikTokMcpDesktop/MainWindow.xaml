@@ -63,9 +63,20 @@
               <ComboBoxItem Content="JSON body（推荐）" Tag="Json" IsSelected="True"/>
               <ComboBoxItem Content="form-urlencoded（调试回退）" Tag="Form"/>
             </ComboBox>
-            <Label Content="同步间隔（分钟）"/>
-            <TextBox x:Name="TxtSyncInterval"/>
-            <CheckBox x:Name="ChkAutoSync" Content="启用定时自动同步" Margin="0,0,0,16"/>
+            <Label Content="定时调度模式"/>
+            <ComboBox x:Name="CmbScheduleMode" Margin="0,0,0,10" SelectionChanged="ScheduleMode_Changed">
+              <ComboBoxItem Content="按间隔（每 N 分钟）" Tag="Interval" IsSelected="True"/>
+              <ComboBoxItem Content="每日定点（本地时区）" Tag="DailyAt"/>
+            </ComboBox>
+            <StackPanel x:Name="PanelInterval">
+              <Label Content="同步间隔（分钟，5～1440）"/>
+              <TextBox x:Name="TxtSyncInterval"/>
+            </StackPanel>
+            <StackPanel x:Name="PanelDailyAt" Visibility="Collapsed">
+              <Label Content="每日执行时间（HH:mm，如 09:30）"/>
+              <TextBox x:Name="TxtDailyAt"/>
+            </StackPanel>
+            <CheckBox x:Name="ChkAutoSync" Content="启用定时自动同步（后台调度拉数）" Margin="0,8,0,16"/>
             <Button Content="保存设置" Click="SaveSettings_Click" HorizontalAlignment="Left"/>
             <TextBlock x:Name="TxtSettingsStatus" Margin="0,12,0,0" Foreground="{StaticResource AccentBrush}"/>
           </StackPanel>
@@ -97,8 +108,17 @@
           <DockPanel>
             <StackPanel DockPanel.Dock="Top">
               <TextBlock Text="数据同步" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,8"/>
-              <TextBlock x:Name="TxtSyncSummary" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12"/>
-              <Button Content="立即同步" Click="SyncNow_Click" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+              <TextBlock x:Name="TxtSyncSummary" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8" TextWrapping="Wrap"/>
+              <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                <StackPanel>
+                  <TextBlock Text="定时自动调度" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                  <TextBlock x:Name="TxtScheduleStatus" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                  <StackPanel Orientation="Horizontal">
+                    <Button x:Name="BtnToggleSchedule" Content="开启调度" Click="ToggleSchedule_Click" Margin="0,0,8,0"/>
+                    <Button Content="立即同步" Click="SyncNow_Click" Background="#334155"/>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
             </StackPanel>
             <ListBox x:Name="LstSyncLogs" FontFamily="Consolas" FontSize="12"/>
           </DockPanel>

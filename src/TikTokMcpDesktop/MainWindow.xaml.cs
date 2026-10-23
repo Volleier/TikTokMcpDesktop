@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using TikTokMcpDesktop.Core.Config;
+using TikTokMcpDesktop.Core.Jobs;
 using TikTokMcpDesktop.Core.Logging;
 using TikTokMcpDesktop.Core.Mcp;
 using TikTokMcpDesktop.Core.OAuth;
@@ -16,6 +18,7 @@ public partial class MainWindow : Window
 
     private readonly ObservableCollection<ChatRow> _chatRows = new();
     private string _webRoute = "/";
+    private DispatcherTimer? _scheduleUiTimer;
 
     public MainWindow()
     {
@@ -23,6 +26,11 @@ public partial class MainWindow : Window
         DataContext = this;
         LstChat.ItemsSource = _chatRows;
         Loaded += MainWindow_Loaded;
+        Closed += (_, _) =>
+        {
+            App.Services.Scheduler.StatusChanged -= OnSchedulerStatus;
+            _scheduleUiTimer?.Stop();
+        };
         AppLog.OnEntry += OnLog;
     }
 
@@ -32,6 +40,11 @@ public partial class MainWindow : Window
         LoadSettingsToUi();
         RefreshAuthStatus();
         RefreshSyncUi();
+        App.Services.Scheduler.StatusChanged += OnSchedulerStatus;
+        _scheduleUiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _scheduleUiTimer.Tick += (_, _) => RefreshScheduleStatus();
+        _scheduleUiTimer.Start();
+        RefreshScheduleStatus();
         try
         {
             await WebView.EnsureCoreWebView2Async();
@@ -43,6 +56,9 @@ public partial class MainWindow : Window
             AppLog.Warn(TxtWebHint.Text);
         }
     }
+
+    private void OnSchedulerStatus(SchedulerStatus _) =>
+        Dispatcher.Invoke(RefreshScheduleStatus);
 
     private void OnLog(LogEntry entry)
     {
@@ -121,10 +137,25 @@ public partial class MainWindow : Window
         TxtAppId.Text = s.AppId;
         TxtAppSecret.Password = s.AppSecret ?? "";
         TxtSyncInterval.Text = s.SyncIntervalMinutes.ToString();
+        TxtDailyAt.Text = s.DailyAtLocalTime;
         ChkAutoSync.IsChecked = s.AutoSyncEnabled;
         TxtApiKey.Password = App.Services.Config.GetApiKey() ?? "";
         SelectCombo(CmbVariant, s.McpVariant.ToString());
         SelectCombo(CmbTokenFormat, s.TokenRequestFormat.ToString());
+        SelectCombo(CmbScheduleMode, s.ScheduleMode.ToString());
+        UpdateScheduleModePanels();
+    }
+
+    private void ScheduleMode_Changed(object sender, SelectionChangedEventArgs e) =>
+        UpdateScheduleModePanels();
+
+    private void UpdateScheduleModePanels()
+    {
+        if (PanelInterval is null || PanelDailyAt is null) return;
+        var daily = CmbScheduleMode.SelectedItem is ComboBoxItem item &&
+                    string.Equals(item.Tag?.ToString(), "DailyAt", StringComparison.OrdinalIgnoreCase);
+        PanelInterval.Visibility = daily ? Visibility.Collapsed : Visibility.Visible;
+        PanelDailyAt.Visibility = daily ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private static void SelectCombo(ComboBox cmb, string tag)
@@ -151,6 +182,17 @@ public partial class MainWindow : Window
             s.AppId = TxtAppId.Text.Trim();
             s.SyncIntervalMinutes = int.TryParse(TxtSyncInterval.Text.Trim(), out var m) ? Math.Clamp(m, 5, 1440) : 60;
             s.AutoSyncEnabled = ChkAutoSync.IsChecked == true;
+            if (CmbScheduleMode.SelectedItem is ComboBoxItem sm)
+                s.ScheduleMode = Enum.Parse<ScheduleMode>(sm.Tag!.ToString()!);
+            if (s.ScheduleMode == ScheduleMode.DailyAt &&
+                !string.IsNullOrWhiteSpace(TxtDailyAt.Text) &&
+                !SchedulePlanner.TryParseDailyAt(TxtDailyAt.Text, out _, out _))
+            {
+                TxtSettingsStatus.Text = "每日时间格式无效，请使用 HH:mm（如 09:30）。";
+                return;
+            }
+            s.DailyAtLocalTime = SchedulePlanner.NormalizeDailyAt(TxtDailyAt.Text);
+            TxtDailyAt.Text = s.DailyAtLocalTime;
             if (CmbVariant.SelectedItem is ComboBoxItem v)
                 s.McpVariant = Enum.Parse<McpVariant>(v.Tag!.ToString()!);
             if (CmbTokenFormat.SelectedItem is ComboBoxItem f)
@@ -159,11 +201,12 @@ public partial class MainWindow : Window
             App.Services.Config.Save(s);
             App.Services.Config.SetApiKey(string.IsNullOrWhiteSpace(TxtApiKey.Password) ? null : TxtApiKey.Password);
             App.Services.Config.SetAppSecret(string.IsNullOrWhiteSpace(TxtAppSecret.Password) ? null : TxtAppSecret.Password);
+            App.Services.Scheduler.Restart();
+            RefreshScheduleStatus();
             if (previousVariant != s.McpVariant)
-                TxtSettingsStatus.Text = "已保存。MCP 变体已切换，请重新授权。";
+                TxtSettingsStatus.Text = "已保存。MCP 变体已切换，请重新授权。调度已按新设置重启。";
             else
-                TxtSettingsStatus.Text = "已保存（密钥经 DPAPI/本地加密存储）。";
-            App.Services.Scheduler.Start();
+                TxtSettingsStatus.Text = "已保存；定时调度已按新设置生效。";
         }
         catch (Exception ex)
         {
@@ -246,13 +289,43 @@ public partial class MainWindow : Window
     {
         var latest = App.Services.Db.GetLatestSync();
         TxtSyncSummary.Text = latest is null
-            ? "尚未同步。授权后点击「立即同步」。"
+            ? "尚未同步。授权后点击「立即同步」，或开启下方定时调度。"
             : latest.ToString();
+        RefreshScheduleStatus();
         LstSyncLogs.Items.Clear();
         foreach (var line in App.Services.Db.GetSyncLogs(200))
             LstSyncLogs.Items.Add(line.ToString());
         if (LstSyncLogs.Items.Count > 0)
             LstSyncLogs.ScrollIntoView(LstSyncLogs.Items[^1]);
+    }
+
+    private void RefreshScheduleStatus()
+    {
+        if (TxtScheduleStatus is null || BtnToggleSchedule is null) return;
+        var st = App.Services.Scheduler.GetStatus();
+        var running = st.IsJobRunning ? " · 正在执行拉数…" : "";
+        TxtScheduleStatus.Text = st.Summary + running;
+        BtnToggleSchedule.Content = st.Enabled ? "关闭调度" : "开启调度";
+    }
+
+    private void ToggleSchedule_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var s = App.Services.Config.Load();
+            s.AutoSyncEnabled = !s.AutoSyncEnabled;
+            App.Services.Config.Save(s);
+            ChkAutoSync.IsChecked = s.AutoSyncEnabled;
+            App.Services.Scheduler.Restart();
+            RefreshScheduleStatus();
+            TxtSyncSummary.Text = s.AutoSyncEnabled
+                ? "已开启定时调度（详见下方状态）。"
+                : "已关闭定时调度。";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "调度", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private async void SyncNow_Click(object sender, RoutedEventArgs e)
@@ -261,6 +334,7 @@ public partial class MainWindow : Window
         {
             TxtSyncSummary.Text = "同步中…";
             var result = await App.Services.Pull.RunAsync();
+            App.Services.Scheduler.MarkRunCompleted();
             RefreshSyncUi();
             MessageBox.Show(result.Message ?? (result.Success ? "完成" : "失败"),
                 "同步", MessageBoxButton.OK,

@@ -12,6 +12,7 @@
 - **OAuth PKCE（Open MCP）**：**默认无需填写 client_id**——授权时先 `POST {mcp}/oauth/register` 动态注册公钥客户端，再打开 `mcp-tt4b-authorize` → 本机回调 → **JSON 换票**；也可手动填固定 client_id；flat/layer 分存 token
 - **MCP**：`Authorization: Bearer` + JSON-RPC + SSE；只读白名单（对齐 AIEcomPlex 工具目录），写工具硬拒
 - **对话 / 同步 / 表格·看板**：均在桌面壳内完成
+- **定时自动调度**：支持「每 N 分钟」或「每日定点（本地时区）」后台拉数；同步页可一键开/关并显示下次执行时间
 
 ## 环境要求
 

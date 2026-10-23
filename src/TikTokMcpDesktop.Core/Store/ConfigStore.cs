@@ -52,6 +52,8 @@ public sealed class ConfigStore
                 TokenRequestFormat = settings.TokenRequestFormat,
                 SyncIntervalMinutes = settings.SyncIntervalMinutes,
                 AutoSyncEnabled = settings.AutoSyncEnabled,
+                ScheduleMode = settings.ScheduleMode,
+                DailyAtLocalTime = settings.DailyAtLocalTime,
                 OAuthCallbackPort = settings.OAuthCallbackPort,
                 AuthorizeUrlOverride = settings.AuthorizeUrlOverride,
                 McpUrlOverride = settings.McpUrlOverride

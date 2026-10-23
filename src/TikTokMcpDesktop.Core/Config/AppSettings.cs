@@ -12,6 +12,14 @@ public enum TokenRequestFormat
     Form
 }
 
+public enum ScheduleMode
+{
+    /// <summary>Every N minutes.</summary>
+    Interval,
+    /// <summary>Once per day at local HH:mm.</summary>
+    DailyAt
+}
+
 /// <summary>
 /// Aligns with AIEcomPlex <c>aiecomplex.tiktok.ads</c> / TikTokAdsProperties (Open MCP, not Marketing API).
 /// </summary>
@@ -33,6 +41,9 @@ public sealed class AppSettings
     public TokenRequestFormat TokenRequestFormat { get; set; } = TokenRequestFormat.Json;
     public int SyncIntervalMinutes { get; set; } = 60;
     public bool AutoSyncEnabled { get; set; }
+    public ScheduleMode ScheduleMode { get; set; } = ScheduleMode.Interval;
+    /// <summary>Local time for <see cref="ScheduleMode.DailyAt"/>, format HH:mm (e.g. 09:30).</summary>
+    public string DailyAtLocalTime { get; set; } = "09:00";
     public int OAuthCallbackPort { get; set; } = 17865;
 
     /// <summary>Override authorize URL; empty = default TT4B portal.</summary>
