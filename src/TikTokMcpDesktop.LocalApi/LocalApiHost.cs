@@ -126,7 +126,10 @@ public sealed class LocalApiHost : IAsyncDisposable
             ctx.Response.Headers.CacheControl = "no-cache";
             await ctx.Response.Body.FlushAsync(ct);
 
-            void Handler() => _ = WriteEventAsync(ctx, "data-changed", CancellationToken.None);
+            void Handler()
+            {
+                _ = SafeWriteEventAsync(ctx, "data-changed");
+            }
 
             services.Pull.DataChanged += Handler;
             try
@@ -165,5 +168,20 @@ public sealed class LocalApiHost : IAsyncDisposable
         var bytes = Encoding.UTF8.GetBytes(payload);
         await ctx.Response.Body.WriteAsync(bytes, ct);
         await ctx.Response.Body.FlushAsync(ct);
+    }
+
+    private static async Task SafeWriteEventAsync(HttpContext ctx, string evt)
+    {
+        try
+        {
+            if (ctx.RequestAborted.IsCancellationRequested) return;
+            await WriteEventAsync(ctx, evt, ctx.RequestAborted);
+        }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
+        catch (Exception ex)
+        {
+            AppLog.Debug($"SSE write failed: {ex.Message}");
+        }
     }
 }

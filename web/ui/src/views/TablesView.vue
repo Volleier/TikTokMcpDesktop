@@ -89,7 +89,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api, type DataField, type DataTableDetail, type DataTableMeta, type RecordPage } from '../api/client'
+import { api, type DataTableDetail, type DataTableMeta, type RecordPage } from '../api/client'
+
+function errMessage(e: unknown): string {
+  if (e instanceof Error) return e.message
+  return String(e)
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -136,8 +141,8 @@ async function loadTables() {
     if (!tableId.value && tables.value[0]) {
       await router.replace(`/tables/${tables.value[0].id}`)
     }
-  } catch (e: any) {
-    error.value = e.message || String(e)
+  } catch (e: unknown) {
+    error.value = errMessage(e)
   } finally {
     loading.value = false
   }
@@ -155,8 +160,8 @@ async function loadDetailAndRecords() {
     detail.value.fields.forEach(f => { columnVisible[f.id] = f.visible })
     cursor.value = undefined
     await reloadRecords()
-  } catch (e: any) {
-    error.value = e.message || String(e)
+  } catch (e: unknown) {
+    error.value = errMessage(e)
   }
 }
 
@@ -187,7 +192,7 @@ function prevPage() {
 async function doExport() {
   if (!tableId.value) return
   try { await api.exportCsv(tableId.value) }
-  catch (e: any) { error.value = e.message || String(e) }
+  catch (e: unknown) { error.value = errMessage(e) }
 }
 
 const onDataChanged = () => { loadTables().then(loadDetailAndRecords) }

@@ -33,8 +33,8 @@
           :class="[`span-${Math.min(w.colSpan || 1, 2)}`, w.type === 'kpi' ? 'kpi-card' : '']"
         >
           <div class="w-title">{{ w.title }}</div>
-          <KpiWidget v-if="w.type === 'kpi'" :payload="data.widgets[w.id]" />
-          <ChartWidget v-else-if="w.type.startsWith('chart-')" :type="w.type" :payload="data.widgets[w.id]" />
+          <KpiWidget v-if="w.type === 'kpi'" :payload="asKpi(data.widgets[w.id])" />
+          <ChartWidget v-else-if="w.type.startsWith('chart-')" :type="w.type" :payload="asChart(data.widgets[w.id])" />
           <TableWidget v-else-if="w.type === 'data-table'" :payload="data.widgets[w.id]" />
           <div v-else class="muted">未知组件 {{ w.type }}</div>
         </div>
@@ -55,6 +55,19 @@ import { api, type DashboardData, type DashboardLayout, type DashboardSummary } 
 import KpiWidget from '../components/KpiWidget.vue'
 import ChartWidget from '../components/ChartWidget.vue'
 import TableWidget from '../components/TableWidget.vue'
+
+function errMessage(e: unknown): string {
+  if (e instanceof Error) return e.message
+  return String(e)
+}
+
+function asKpi(v: unknown) {
+  return (v ?? null) as { value?: unknown; unit?: string } | null
+}
+
+function asChart(v: unknown) {
+  return (v ?? null) as { labels?: string[]; values?: number[]; name?: string; children?: unknown[] } | null
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -81,10 +94,10 @@ async function reload() {
   try {
     layout.value = await api.getDashboard(currentId.value)
     data.value = await api.dashboardData(currentId.value)
-  } catch (e: any) {
+  } catch (e: unknown) {
     layout.value = null
     data.value = null
-    error.value = e.message || String(e)
+    error.value = errMessage(e)
   }
 }
 
@@ -94,8 +107,8 @@ onMounted(async () => {
   try {
     await bootstrap()
     await reload()
-  } catch (e: any) {
-    error.value = e.message || String(e)
+  } catch (e: unknown) {
+    error.value = errMessage(e)
   }
   window.addEventListener('ttmcp-data-changed', onDataChanged)
 })

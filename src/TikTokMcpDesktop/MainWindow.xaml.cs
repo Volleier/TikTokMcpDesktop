@@ -29,6 +29,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             App.Services.Scheduler.StatusChanged -= OnSchedulerStatus;
+            AppLog.OnEntry -= OnLog;
             _scheduleUiTimer?.Stop();
         };
         AppLog.OnEntry += OnLog;

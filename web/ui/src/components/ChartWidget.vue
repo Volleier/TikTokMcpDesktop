@@ -11,7 +11,7 @@ type TreeNode = { name: string; value?: number; children?: TreeNode[] }
 
 const props = defineProps<{
   type: string
-  payload?: (SeriesPayload & TreeNode) | null
+  payload?: SeriesPayload | TreeNode | null
 }>()
 
 const el = ref<HTMLDivElement | null>(null)
@@ -24,9 +24,10 @@ function render() {
   if (!chart) chart = echarts.init(el.value, undefined, { renderer: 'canvas' })
 
   if (props.type === 'chart-tree') {
-    const root = props.payload?.name
-      ? props.payload
-      : { name: '暂无结构', children: [] }
+    const tree = props.payload as TreeNode | null | undefined
+    const root = tree?.name
+      ? tree
+      : { name: '暂无结构', children: [] as TreeNode[] }
     chart.setOption({
       tooltip: { trigger: 'item', triggerOn: 'mousemove' },
       series: [{
@@ -61,8 +62,9 @@ function render() {
     return
   }
 
-  const labels = props.payload?.labels || []
-  const values = (props.payload?.values || []).map(Number)
+  const series = props.payload as SeriesPayload | null | undefined
+  const labels = series?.labels || []
+  const values = (series?.values || []).map(Number)
   const isPie = props.type === 'chart-pie'
 
   if (isPie) {

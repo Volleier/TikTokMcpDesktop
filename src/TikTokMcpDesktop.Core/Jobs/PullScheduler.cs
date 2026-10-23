@@ -24,11 +24,14 @@ public sealed class PullScheduler : IAsyncDisposable
     private readonly PullJob _job;
     private readonly ConfigStore _config;
     private readonly object _gate = new();
+    private readonly List<CancellationTokenSource> _retired = new();
     private CancellationTokenSource? _cts;
     private Task? _loop;
     private DateTimeOffset? _lastRunAt;
     private DateTimeOffset? _nextRunAt;
     private bool _jobRunning;
+    private int _epoch;
+    private bool _disposed;
 
     public event Action<SchedulerStatus>? StatusChanged;
 
@@ -43,17 +46,22 @@ public sealed class PullScheduler : IAsyncDisposable
         var settings = _config.Load();
         lock (_gate)
         {
-            return BuildStatus(settings, _cts is not null);
+            return BuildStatus(settings, _loop is { IsCompleted: false });
         }
     }
 
     public void Start()
     {
+        int epoch;
+        CancellationToken token;
         lock (_gate)
         {
-            StopUnlocked();
+            if (_disposed) return;
+            epoch = Interlocked.Increment(ref _epoch);
+            RetireCurrentCtsUnlocked();
             _cts = new CancellationTokenSource();
-            _loop = RunLoopAsync(_cts.Token);
+            token = _cts.Token;
+            _loop = RunLoopAsync(token, epoch);
         }
         Publish();
         AppLog.Info("PullScheduler started");
@@ -65,7 +73,9 @@ public sealed class PullScheduler : IAsyncDisposable
     {
         lock (_gate)
         {
-            StopUnlocked();
+            Interlocked.Increment(ref _epoch);
+            RetireCurrentCtsUnlocked();
+            _nextRunAt = null;
         }
         Publish();
         AppLog.Info("PullScheduler stopped");
@@ -83,18 +93,26 @@ public sealed class PullScheduler : IAsyncDisposable
         Publish();
     }
 
-    private void StopUnlocked()
+    private void RetireCurrentCtsUnlocked()
     {
         if (_cts is null) return;
         try { _cts.Cancel(); } catch { /* ignore */ }
-        _cts.Dispose();
+        _retired.Add(_cts);
         _cts = null;
-        _nextRunAt = null;
+        // Bound growth if Start is hammered; DisposeAsync cleans the rest.
+        if (_retired.Count > 8)
+        {
+            foreach (var old in _retired)
+            {
+                try { old.Dispose(); } catch { /* ignore */ }
+            }
+            _retired.Clear();
+        }
     }
 
-    private async Task RunLoopAsync(CancellationToken ct)
+    private async Task RunLoopAsync(CancellationToken ct, int epoch)
     {
-        while (!ct.IsCancellationRequested)
+        while (!ct.IsCancellationRequested && Volatile.Read(ref _epoch) == epoch)
         {
             try
             {
@@ -103,8 +121,7 @@ public sealed class PullScheduler : IAsyncDisposable
                 {
                     lock (_gate) { _nextRunAt = null; }
                     Publish();
-                    // Idle poll so enabling later is picked up without full restart
-                    await Task.Delay(TimeSpan.FromSeconds(15), ct);
+                    await DelaySafeAsync(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false);
                     continue;
                 }
 
@@ -118,16 +135,16 @@ public sealed class PullScheduler : IAsyncDisposable
 
                 if (delay == Timeout.InfiniteTimeSpan)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(15), ct);
+                    await DelaySafeAsync(TimeSpan.FromSeconds(15), ct).ConfigureAwait(false);
                     continue;
                 }
 
-                // Cap single wait so settings changes apply within 30s
                 var slice = delay > TimeSpan.FromSeconds(30) ? TimeSpan.FromSeconds(30) : delay;
                 if (slice > TimeSpan.Zero)
-                    await Task.Delay(slice, ct);
+                    await DelaySafeAsync(slice, ct).ConfigureAwait(false);
 
-                // Re-evaluate after wake
+                if (Volatile.Read(ref _epoch) != epoch) break;
+
                 settings = _config.Load();
                 if (!settings.AutoSyncEnabled) continue;
 
@@ -146,7 +163,7 @@ public sealed class PullScheduler : IAsyncDisposable
                 Publish();
                 try
                 {
-                    var result = await _job.RunAsync(ct);
+                    var result = await _job.RunAsync(ct).ConfigureAwait(false);
                     AppLog.Info(result.Message ?? (result.Success ? "scheduled pull ok" : "scheduled pull failed"));
                 }
                 finally
@@ -160,15 +177,33 @@ public sealed class PullScheduler : IAsyncDisposable
                     Publish();
                 }
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested || Volatile.Read(ref _epoch) != epoch)
             {
                 break;
             }
             catch (Exception ex)
             {
                 AppLog.Warn($"Scheduler error: {ex.Message}");
-                try { await Task.Delay(TimeSpan.FromSeconds(10), ct); } catch { /* ignore */ }
+                var delayed = await DelaySafeAsync(TimeSpan.FromSeconds(10), ct).ConfigureAwait(false);
+                if (!delayed) break;
             }
+        }
+    }
+
+    private static async Task<bool> DelaySafeAsync(TimeSpan delay, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(delay, ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
         }
     }
 
@@ -203,13 +238,25 @@ public sealed class PullScheduler : IAsyncDisposable
         Task? loop;
         lock (_gate)
         {
-            StopUnlocked();
+            _disposed = true;
+            Interlocked.Increment(ref _epoch);
+            RetireCurrentCtsUnlocked();
             loop = _loop;
             _loop = null;
         }
+
         if (loop is not null)
         {
-            try { await loop; } catch { /* ignore */ }
+            try { await loop.ConfigureAwait(false); } catch { /* ignore */ }
+        }
+
+        lock (_gate)
+        {
+            foreach (var old in _retired)
+            {
+                try { old.Dispose(); } catch { /* ignore */ }
+            }
+            _retired.Clear();
         }
     }
 }

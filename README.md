@@ -64,10 +64,10 @@ dotnet run --project src/TikTokMcpDesktop -c Release
 
 ## 使用步骤
 
-1. 打开应用 → **设置**：填入 OpenAI 兼容 `base_url`、API Key、model、TikTok `client_id` → 保存  
+1. 打开应用 → **设置**：填入 OpenAI 兼容 `base_url`、API Key、model（`client_id` 可选；默认 DCR 自动注册）→ 保存  
 2. **连接** → 授权登录（浏览器 TT4B）→ 显示「已连接」→ 可探测 `tools/list`  
-3. **同步** → 立即同步；结果写入本地  
-4. **表格 / 看板**：浏览拉数结果、筛选排序、导出 CSV、切换预置看板  
+3. **同步**：立即同步，或开启定时调度（间隔 / 每日定点）  
+4. **表格 / 看板**：浏览拉数结果、筛选排序、导出 CSV；四套预置看板（概览 / 结构树 / 效果 / 账户）  
 5. **对话**：用自然语言触发只读 MCP 工具  
 
 授权约 30 天；refresh 失效时按提示重新授权。切换 flat/layer 会分存 token，需重授权。
@@ -80,10 +80,13 @@ dotnet run --project src/TikTokMcpDesktop -c Release
 
 ## 验收对照
 
-- [x] Core：PKCE、SSE、白名单、入库、看板、LocalApi loopback 测试通过  
-- [x] Web UI：表格筛选 / CSV / 三套预置看板  
-- [x] WPF 壳：设置 / 授权 / 同步 / 对话 / WebView2 宿主（需在 Windows 运行）  
-- [ ] 真机 TikTok 授权与真实 MCP 工具：需有效 `client_id` 与 TT4B 账号（本环境为 Linux，无法跑 WPF GUI）
+| 能力 | 状态 |
+|------|------|
+| Core：PKCE / DCR、SSE、白名单、入库、看板、LocalApi | ✅ 单测覆盖 |
+| 定时调度（间隔 / 每日定点） | ✅ 已实现 + 单测 |
+| Web UI：表格筛选 / CSV / 四套看板（含树图、饼图） | ✅ DevHost 可预览 |
+| WPF 壳：设置 / 授权 / 同步 / 对话 / WebView2 | ✅ 代码齐备（需 Windows 真机） |
+| 真机 TikTok 授权 + 真实 MCP 拉数 | ⏳ 依赖 TT4B 账号与 Windows 桌面 |
 
 ## Open MCP 鉴权契约（对齐 AIEcomPlex）
 

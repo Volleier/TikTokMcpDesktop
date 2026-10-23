@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps<{ payload?: any }>()
+const props = defineProps<{ payload?: unknown }>()
 
 const labels: Record<string, string> = {
   campaign: '广告系列',
@@ -48,10 +48,10 @@ const labels: Record<string, string> = {
   stat_time_day: '日期'
 }
 
-const rows = computed<Record<string, any>[]>(() => {
+const rows = computed<Record<string, unknown>[]>(() => {
   const p = props.payload
   if (!Array.isArray(p)) return []
-  return p.map((x) => (x && typeof x === 'object' ? x : { value: x }))
+  return p.map((x) => (x && typeof x === 'object' ? x as Record<string, unknown> : { value: x }))
 })
 const columns = computed(() => {
   const keys = new Set<string>()

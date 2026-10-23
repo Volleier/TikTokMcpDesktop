@@ -126,6 +126,8 @@ public sealed class SecretStore
 
     private static byte[] AesUnprotect(byte[] data)
     {
+        if (data.Length <= 16)
+            throw new CryptographicException("Secrets blob is truncated or corrupt.");
         using var aes = Aes.Create();
         aes.Key = DeriveKey();
         var iv = new byte[16];

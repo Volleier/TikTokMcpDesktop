@@ -49,7 +49,7 @@ export interface DashboardLayout {
 
 export interface DashboardData {
   id: string
-  widgets: Record<string, any>
+  widgets: Record<string, unknown>
   empty: boolean
   message?: string | null
 }
