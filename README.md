@@ -14,6 +14,7 @@
 - **对话 / 同步 / 表格·看板**：均在桌面壳内完成
 - **定时自动调度**：支持「每 N 分钟」或「每日定点（本地时区）」后台拉数；同步页可一键开/关并显示下次执行时间
 - **表格 / 看板**：按 Open MCP 工具入库展示（广告主 / 系列 / 组 / 广告 / 综合报表）；含树状结构图、目标与系列饼图、趋势折线、效果排行表。字段说明见 [`docs/tiktok-mcp-data.md`](docs/tiktok-mcp-data.md)
+- **飞书应用机器人**：TikTok 在桌面鉴权拉数后，可用飞书自建应用（`tenant_access_token`）把广告汇总卡片推到群/单聊；支持同步后自动推送与 `POST /api/feishu/push`。见 [`docs/feishu-bot.md`](docs/feishu-bot.md)
 
 ## 环境要求
 
@@ -86,7 +87,9 @@ dotnet run --project src/TikTokMcpDesktop -c Release
 | 定时调度（间隔 / 每日定点） | ✅ 已实现 + 单测 |
 | Web UI：表格筛选 / CSV / 四套看板（含树图、饼图） | ✅ DevHost 可预览 |
 | WPF 壳：设置 / 授权 / 同步 / 对话 / WebView2 | ✅ 代码齐备（需 Windows 真机） |
+| 飞书应用机器人推送（卡片 / LocalApi） | ✅ 已实现（需配置飞书 App 凭证） |
 | 真机 TikTok 授权 + 真实 MCP 拉数 | ⏳ 依赖 TT4B 账号与 Windows 桌面 |
+| 7×24 独立云端 Worker（无桌面常开） | ⏳ 可用 DevHost/LocalApi 触发；完整拆分待后续 |
 
 ## Open MCP 鉴权契约（对齐 AIEcomPlex）
 

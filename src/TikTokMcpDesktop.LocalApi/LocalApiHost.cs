@@ -120,6 +120,34 @@ public sealed class LocalApiHost : IAsyncDisposable
         app.MapGet("/api/sync/latest", () => Results.Ok(services.Db.GetLatestSync() ?? new { }));
         app.MapGet("/api/sync/logs", () => Results.Ok(services.Db.GetSyncLogs()));
 
+        app.MapGet("/api/feishu/status", () =>
+        {
+            var s = services.Config.Load();
+            return Results.Ok(new
+            {
+                enabled = s.FeishuPushEnabled,
+                configured = services.Feishu.IsConfigured(s),
+                appIdSet = !string.IsNullOrWhiteSpace(s.FeishuAppId),
+                receiveIdType = s.FeishuReceiveIdType,
+                receiveIdSet = !string.IsNullOrWhiteSpace(s.FeishuReceiveId),
+                pushAfterSync = s.FeishuPushAfterSync
+            });
+        });
+        app.MapPost("/api/feishu/push", async (CancellationToken ct) =>
+        {
+            try
+            {
+                var result = await services.Feishu.PushAdsSummaryAsync("手动/云端触发推送", ct);
+                return result.Success
+                    ? Results.Ok(result)
+                    : Results.BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { success = false, message = ex.Message });
+            }
+        });
+
         app.MapGet("/api/events", async (HttpContext ctx, CancellationToken ct) =>
         {
             ctx.Response.Headers.ContentType = "text/event-stream";

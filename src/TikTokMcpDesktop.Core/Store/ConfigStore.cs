@@ -54,6 +54,11 @@ public sealed class ConfigStore
                 AutoSyncEnabled = settings.AutoSyncEnabled,
                 ScheduleMode = settings.ScheduleMode,
                 DailyAtLocalTime = settings.DailyAtLocalTime,
+                FeishuPushEnabled = settings.FeishuPushEnabled,
+                FeishuAppId = settings.FeishuAppId,
+                FeishuReceiveIdType = settings.FeishuReceiveIdType,
+                FeishuReceiveId = settings.FeishuReceiveId,
+                FeishuPushAfterSync = settings.FeishuPushAfterSync,
                 OAuthCallbackPort = settings.OAuthCallbackPort,
                 AuthorizeUrlOverride = settings.AuthorizeUrlOverride,
                 McpUrlOverride = settings.McpUrlOverride
@@ -73,5 +78,12 @@ public sealed class ConfigStore
     public void SetAppSecret(string? secret)
     {
         _secrets.Update(p => p.TikTokAppSecret = string.IsNullOrWhiteSpace(secret) ? null : secret);
+    }
+
+    public string? GetFeishuAppSecret() => _secrets.Load().FeishuAppSecret;
+
+    public void SetFeishuAppSecret(string? secret)
+    {
+        _secrets.Update(p => p.FeishuAppSecret = string.IsNullOrWhiteSpace(secret) ? null : secret);
     }
 }

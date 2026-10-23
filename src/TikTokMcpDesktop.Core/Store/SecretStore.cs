@@ -9,6 +9,8 @@ public sealed class SecretsPayload
     public string? OpenAiApiKey { get; set; }
     /// <summary>Optional app secret for token JSON field "secret" (rarely needed for Open MCP PKCE).</summary>
     public string? TikTokAppSecret { get; set; }
+    /// <summary>Feishu/Lark app_secret for tenant_access_token (application bot).</summary>
+    public string? FeishuAppSecret { get; set; }
     public Dictionary<string, OAuthTokenSet> TokensByVariant { get; set; } = new();
     /// <summary>Per-variant client_id from Dynamic Client Registration (no preconfigured app required).</summary>
     public Dictionary<string, DynamicClientRegistration> DynamicClientsByVariant { get; set; } = new();

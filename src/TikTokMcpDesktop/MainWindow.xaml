@@ -77,7 +77,27 @@
               <TextBox x:Name="TxtDailyAt"/>
             </StackPanel>
             <CheckBox x:Name="ChkAutoSync" Content="启用定时自动同步（后台调度拉数）" Margin="0,8,0,16"/>
-            <Button Content="保存设置" Click="SaveSettings_Click" HorizontalAlignment="Left"/>
+
+            <TextBlock Text="飞书应用机器人推送" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,8"/>
+            <TextBlock TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"
+                       Text="鉴权 TikTok Open MCP 后，可用飞书自建应用机器人将广告汇总卡片推到群/单聊。需在飞书开放平台开启机器人能力并申请 im:message:send_as_bot。"/>
+            <CheckBox x:Name="ChkFeishuEnabled" Content="启用飞书推送" Margin="0,0,0,8"/>
+            <CheckBox x:Name="ChkFeishuAfterSync" Content="同步成功后自动推送汇总卡片" Margin="0,0,0,8"/>
+            <Label Content="飞书 App ID"/>
+            <TextBox x:Name="TxtFeishuAppId"/>
+            <Label Content="飞书 App Secret"/>
+            <PasswordBox x:Name="TxtFeishuAppSecret"/>
+            <Label Content="接收方类型（chat_id / open_id / user_id / email）"/>
+            <ComboBox x:Name="CmbFeishuReceiveType" Margin="0,0,0,10">
+              <ComboBoxItem Content="群聊 chat_id" Tag="chat_id" IsSelected="True"/>
+              <ComboBoxItem Content="用户 open_id" Tag="open_id"/>
+              <ComboBoxItem Content="用户 user_id" Tag="user_id"/>
+              <ComboBoxItem Content="邮箱 email" Tag="email"/>
+            </ComboBox>
+            <Label Content="接收方 ID（群 oc_… 或用户 ou_…）"/>
+            <TextBox x:Name="TxtFeishuReceiveId"/>
+
+            <Button Content="保存设置" Click="SaveSettings_Click" HorizontalAlignment="Left" Margin="0,12,0,0"/>
             <TextBlock x:Name="TxtSettingsStatus" Margin="0,12,0,0" Foreground="{StaticResource AccentBrush}"/>
           </StackPanel>
         </Border>
@@ -115,7 +135,8 @@
                   <TextBlock x:Name="TxtScheduleStatus" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                   <StackPanel Orientation="Horizontal">
                     <Button x:Name="BtnToggleSchedule" Content="开启调度" Click="ToggleSchedule_Click" Margin="0,0,8,0"/>
-                    <Button Content="立即同步" Click="SyncNow_Click" Background="#334155"/>
+                    <Button Content="立即同步" Click="SyncNow_Click" Background="#334155" Margin="0,0,8,0"/>
+                    <Button Content="推送到飞书" Click="PushFeishu_Click" Background="#0F766E"/>
                   </StackPanel>
                 </StackPanel>
               </Border>

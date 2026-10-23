@@ -1,4 +1,5 @@
 using TikTokMcpDesktop.Core.Dashboards;
+using TikTokMcpDesktop.Core.Feishu;
 using TikTokMcpDesktop.Core.Jobs;
 using TikTokMcpDesktop.Core.Logging;
 using TikTokMcpDesktop.Core.Mcp;
@@ -22,9 +23,11 @@ public sealed class AppServices : IAsyncDisposable
     public OpenAiClient OpenAi { get; }
     public ChatAgent Chat { get; }
     public TableIngestService Ingest { get; }
+    public DashboardService Dashboards { get; }
+    public FeishuClient FeishuHttp { get; }
+    public FeishuPushService Feishu { get; }
     public PullJob Pull { get; }
     public PullScheduler Scheduler { get; }
-    public DashboardService Dashboards { get; }
 
     public static AppServices? Current { get; private set; }
 
@@ -41,9 +44,11 @@ public sealed class AppServices : IAsyncDisposable
         OpenAi = new OpenAiClient();
         Chat = new ChatAgent(OpenAi, Mcp, Config);
         Ingest = new TableIngestService(Db);
-        Pull = new PullJob(Mcp, Config, Db, Ingest, Paths);
-        Scheduler = new PullScheduler(Pull, Config);
         Dashboards = new DashboardService(Db);
+        FeishuHttp = new FeishuClient();
+        Feishu = new FeishuPushService(Config, Secrets, Dashboards, FeishuHttp);
+        Pull = new PullJob(Mcp, Config, Db, Ingest, Paths, Feishu);
+        Scheduler = new PullScheduler(Pull, Config);
         Current = this;
         AppLog.Info($"AppServices ready at {Paths.Root}");
     }

@@ -144,6 +144,12 @@ public partial class MainWindow : Window
         SelectCombo(CmbVariant, s.McpVariant.ToString());
         SelectCombo(CmbTokenFormat, s.TokenRequestFormat.ToString());
         SelectCombo(CmbScheduleMode, s.ScheduleMode.ToString());
+        ChkFeishuEnabled.IsChecked = s.FeishuPushEnabled;
+        ChkFeishuAfterSync.IsChecked = s.FeishuPushAfterSync;
+        TxtFeishuAppId.Text = s.FeishuAppId;
+        TxtFeishuReceiveId.Text = s.FeishuReceiveId;
+        TxtFeishuAppSecret.Password = App.Services.Config.GetFeishuAppSecret() ?? "";
+        SelectCombo(CmbFeishuReceiveType, string.IsNullOrWhiteSpace(s.FeishuReceiveIdType) ? "chat_id" : s.FeishuReceiveIdType);
         UpdateScheduleModePanels();
     }
 
@@ -199,15 +205,25 @@ public partial class MainWindow : Window
             if (CmbTokenFormat.SelectedItem is ComboBoxItem f)
                 s.TokenRequestFormat = Enum.Parse<TokenRequestFormat>(f.Tag!.ToString()!);
 
+            s.FeishuPushEnabled = ChkFeishuEnabled.IsChecked == true;
+            s.FeishuPushAfterSync = ChkFeishuAfterSync.IsChecked == true;
+            s.FeishuAppId = TxtFeishuAppId.Text.Trim();
+            s.FeishuReceiveId = TxtFeishuReceiveId.Text.Trim();
+            if (CmbFeishuReceiveType.SelectedItem is ComboBoxItem fr)
+                s.FeishuReceiveIdType = fr.Tag!.ToString()!;
+
             App.Services.Config.Save(s);
             App.Services.Config.SetApiKey(string.IsNullOrWhiteSpace(TxtApiKey.Password) ? null : TxtApiKey.Password);
             App.Services.Config.SetAppSecret(string.IsNullOrWhiteSpace(TxtAppSecret.Password) ? null : TxtAppSecret.Password);
+            App.Services.Config.SetFeishuAppSecret(
+                string.IsNullOrWhiteSpace(TxtFeishuAppSecret.Password) ? null : TxtFeishuAppSecret.Password);
+            App.Services.FeishuHttp.InvalidateTokenCache();
             App.Services.Scheduler.Restart();
             RefreshScheduleStatus();
             if (previousVariant != s.McpVariant)
                 TxtSettingsStatus.Text = "已保存。MCP 变体已切换，请重新授权。调度已按新设置重启。";
             else
-                TxtSettingsStatus.Text = "已保存；定时调度已按新设置生效。";
+                TxtSettingsStatus.Text = "已保存；定时调度与飞书推送设置已生效。";
         }
         catch (Exception ex)
         {
@@ -329,6 +345,24 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void PushFeishu_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            TxtSyncSummary.Text = "正在推送到飞书…";
+            var result = await App.Services.Feishu.PushAdsSummaryAsync("手动推送");
+            RefreshSyncUi();
+            MessageBox.Show(result.Message, "飞书推送",
+                MessageBoxButton.OK,
+                result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "飞书推送失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            RefreshSyncUi();
+        }
+    }
+
     private async void SyncNow_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -337,8 +371,10 @@ public partial class MainWindow : Window
             var result = await App.Services.Pull.RunAsync();
             App.Services.Scheduler.MarkRunCompleted();
             RefreshSyncUi();
-            MessageBox.Show(result.Message ?? (result.Success ? "完成" : "失败"),
-                "同步", MessageBoxButton.OK,
+            var detail = result.Message ?? (result.Success ? "完成" : "失败");
+            if (!string.IsNullOrWhiteSpace(result.FeishuMessage))
+                detail += Environment.NewLine + result.FeishuMessage;
+            MessageBox.Show(detail, "同步", MessageBoxButton.OK,
                 result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
         catch (ReauthRequiredException ex)

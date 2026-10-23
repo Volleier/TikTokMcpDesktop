@@ -44,6 +44,18 @@ public sealed class AppSettings
     public ScheduleMode ScheduleMode { get; set; } = ScheduleMode.Interval;
     /// <summary>Local time for <see cref="ScheduleMode.DailyAt"/>, format HH:mm (e.g. 09:30).</summary>
     public string DailyAtLocalTime { get; set; } = "09:00";
+
+    /// <summary>Enable Feishu application-bot push after successful MCP sync.</summary>
+    public bool FeishuPushEnabled { get; set; }
+    /// <summary>Feishu app_id from developer console.</summary>
+    public string FeishuAppId { get; set; } = "";
+    /// <summary>open_id / chat_id / user_id / email — see Feishu im/v1/messages receive_id_type.</summary>
+    public string FeishuReceiveIdType { get; set; } = "chat_id";
+    /// <summary>Target user or chat id for bot messages.</summary>
+    public string FeishuReceiveId { get; set; } = "";
+    /// <summary>When true, PushJob auto-pushes a summary card after a successful pull.</summary>
+    public bool FeishuPushAfterSync { get; set; } = true;
+
     public int OAuthCallbackPort { get; set; } = 17865;
 
     /// <summary>Override authorize URL; empty = default TT4B portal.</summary>

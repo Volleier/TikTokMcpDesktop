@@ -1,4 +1,5 @@
 using TikTokMcpDesktop.Core.Config;
+using TikTokMcpDesktop.Core.Feishu;
 using TikTokMcpDesktop.Core.Logging;
 using TikTokMcpDesktop.Core.Mcp;
 using TikTokMcpDesktop.Core.Store;
@@ -13,6 +14,7 @@ public sealed class PullResult
     public int ToolCount { get; set; }
     public int RecordCount { get; set; }
     public string? Message { get; set; }
+    public string? FeishuMessage { get; set; }
 }
 
 public sealed class PullJob
@@ -22,17 +24,25 @@ public sealed class PullJob
     private readonly DataStore _db;
     private readonly TableIngestService _ingest;
     private readonly AppPaths _paths;
+    private readonly FeishuPushService _feishu;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public event Action? DataChanged;
 
-    public PullJob(McpClient mcp, ConfigStore config, DataStore db, TableIngestService ingest, AppPaths paths)
+    public PullJob(
+        McpClient mcp,
+        ConfigStore config,
+        DataStore db,
+        TableIngestService ingest,
+        AppPaths paths,
+        FeishuPushService feishu)
     {
         _mcp = mcp;
         _config = config;
         _db = db;
         _ingest = ingest;
         _paths = paths;
+        _feishu = feishu;
     }
 
     public async Task<PullResult> RunAsync(CancellationToken ct = default)
@@ -64,7 +74,6 @@ public sealed class PullJob
                 _db.AddSyncLog(runId, "info", $"Calling {tool.Name}");
                 try
                 {
-                    // Prefer empty args; many list tools work with defaults
                     var result = await _mcp.CallToolAsync(settings, tool.Name, new { }, ct);
                     var (_, count) = _ingest.IngestToolResult(tool.Name, result, pullDir);
                     totalRecords += count;
@@ -77,20 +86,31 @@ public sealed class PullJob
                     AppLog.Warn($"Pull tool {tool.Name}: {ex.Message}");
                 }
 
-                await Task.Delay(250, ct); // soft rate limit
+                await Task.Delay(250, ct);
             }
 
             var msg = $"同步完成：{toolCount} 个工具，{totalRecords} 条记录";
             _db.FinishSyncRun(runId, DateTimeOffset.Now, "success", toolCount, totalRecords, msg);
             AppLog.Info(msg);
             DataChanged?.Invoke();
+
+            string? feishuMsg = null;
+            settings = _config.Load();
+            if (settings.FeishuPushAfterSync && _feishu.IsConfigured(settings))
+            {
+                var push = await _feishu.PushAdsSummaryAsync(msg, ct);
+                feishuMsg = push.Message;
+                _db.AddSyncLog(runId, push.Success ? "info" : "warn", $"Feishu: {push.Message}");
+            }
+
             return new PullResult
             {
                 Success = true,
                 RunId = runId,
                 ToolCount = toolCount,
                 RecordCount = totalRecords,
-                Message = msg
+                Message = msg,
+                FeishuMessage = feishuMsg
             };
         }
         catch (Exception ex)
